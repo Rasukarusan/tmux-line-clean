@@ -24,6 +24,10 @@ terminal_line_delete() {
     tput el
   }
 
+  clear() {
+    tput clear
+  }
+
   undo_line() {
     sed -n ${y}p $tmuxBuffer | tr -d '\n'
   }
@@ -76,10 +80,10 @@ terminal_line_delete() {
           clear_line
           ;;
         g)
-          tput clear
+          clear
           ;;
         G)
-          tput clear
+          clear
           restore
           ;;
         $'\x0d') # ENTER
