@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+up_cursor() {
+  tput cuu1
+}
+
+down_cursor() {
+  tput cud1
+}
+
+clear_line() {
+  tput el
+}
+
+clear() {
+  tput clear
+}
+
+undo_line() {
+  local line=$1
+  sed -n ${line}p $tmuxBuffer | tr -d '\n'
+}
+
+set_restore_line() {
+  local lastLine=$(sed '1!G;h;$!d' $tmuxBuffer | grep -nv '^$' | sed -n 1,1p | cut -d : -f 1)
+  local lines=$(grep -c '' $tmuxBuffer)
+  restoreLine=$((lines - lastLine + 1))
+}
+
+restore() {
+  tput cup 0 0
+  sed -n 1,${restoreLine}p $tmuxBuffer
+}
+
+ready_for_restore() {
+  trap "restore && remove_tmux_buffer && exit" 2
+  set_restore_line
+}
+
+create_tmux_buffer() {
+  tmuxBuffer=$(mktemp)
+  tmux capture-pane -pe > $tmuxBuffer
+}
+
+remove_tmux_buffer() {
+  rm $tmuxBuffer
+}
+
+main() {
+  create_tmux_buffer
+  ready_for_restore
+  local currentLine=$restoreLine
+  tput cup $currentLine 0
+
+  while read -s -n 1 char </dev/tty; do
+    case "${char}" in
+      j)
+        currentLine=$((currentLine + 1))
+        undo_line $currentLine
+        down_cursor
+        ;;
+      k)
+        if [ $currentLine -gt 0 ];then
+          currentLine=$((currentLine - 1))
+        fi
+        up_cursor
+        clear_line
+        ;;
+      g)
+        currentLine=0
+        clear
+        ;;
+      G)
+        currentLine=$restoreLine
+        clear
+        restore
+        ;;
+      '') # ENTER
+        break
+        ;;
+      *)
+        ;;
+    esac
+  done
+  remove_tmux_buffer
+}
+main
