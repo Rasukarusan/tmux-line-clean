@@ -57,6 +57,15 @@ bindkey '^k' line_cleaner
 bind-key k send 'tmux-line-clean' ENTER
 ```
 
+## Bonus Examples
+
+There are several scripts, such as one that doesn't use tmux, one that uses stty, and one that uses visual mode.  
+`not-using-tmux` can only delete line.  
+`using-stty`'s behavior is the same as the demo GIF.  
+`visual mode`'s behavior is the following GIF.
+
+![demo_visualmode.gif](https://user-images.githubusercontent.com/17779386/97842280-b9ebc380-1d2a-11eb-8af7-64c1dd0bcc1f.gif)
+
 ### License
 
 [MIT](LICENSE)
