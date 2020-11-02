@@ -1,4 +1,4 @@
-# Tmux Line Delete
+# Tmux Line Clean
 
 Clean up lines in the current pane.  
 Can move like vim!
@@ -21,7 +21,8 @@ $ brew install Rasukarusan/tap/tmux-line-clean
 ### Manually
 
 ```bash
-$ git clone https://github.com/Rasukarusan/tmux-line-clean.git
+$ git clone git@github.com:Rasukarusan/tmux-line-clean.git
+$ mv tmux-line-clean/tmux-line-clean /usr/local/bin/
 ```
 
 ## Usage
