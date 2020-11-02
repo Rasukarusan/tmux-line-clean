@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+
+init_tty() {
+  stty -icanon min 1 -echo -ixon -icrnl 
+}
+
+quit_tty() {
+  stty icanon echo eof '^d' ixon icrnl
+}
+
+getchar() {
+  dd bs=1 count=1 2> /dev/null
+}
+
+up_cursor() {
+  tput cuu1
+}
+
+down_cursor() {
+  tput cud1
+}
+
+clear_input() {
+  tput el
+}
+
+get_cursor_position() {
+  old_settings=$(stty -g) || exit
+  stty -icanon -echo min 0 time 3 || exit
+  printf '\033[6n'
+  pos=$(dd count=1 2> /dev/null)
+  pos=${pos%R*}
+  pos=${pos##*\[}
+  x=${pos##*;} y=${pos%%;*}
+  stty "$old_settings"
+}
+
+remove_tmux_buffer() {
+  rm $tmuxBuffer
+}
+
+select_line() {
+  local line=$1
+  local tmuxBuf=$(perl -pe 's/\e\[[0-9;]*m//g' $tmuxBuffer | sed -n ${line}p | tr -d '\n' )
+  lines+=($y)
+  tput cup $((line - 1)) 0
+  printf "\033[3m${tmuxBuf}\033[m"
+}
+
+deselect_line() {
+  local line=$1
+  [ ${#lines[@]} -gt 0 ] && unset 'lines[${#lines[@]}-1]'
+  tput cup $((line - 1)) 0
+  sed -n ${line}p $tmuxBuffer  | tr -d '\n'
+}
+
+create_tmux_buffer() {
+  tmuxBuffer=$(mktemp)
+  tmux capture-pane -pe > $tmuxBuffer
+}
+
+set_restore_line() {
+  local lastLine=$(sed '1!G;h;$!d' $tmuxBuffer | grep -nv '^$' | sed -n 1,1p | cut -d : -f 1)
+  local lines=$(grep -c '' $tmuxBuffer)
+  restoreLine=$((lines - lastLine + 1))
+}
+
+restore() {
+  tput cup 0 0
+  sed -n 1,${restoreLine}p $tmuxBuffer
+}
+
+ready_for_restore() {
+  trap "restore && remove_tmux_buffer && exit" 2
+  set_restore_line
+}
+
+main() {
+  init_tty
+  create_tmux_buffer
+  ready_for_restore
+
+  local isVisualMode=0
+  lines=()
+  while true ; do
+    char=$(getchar)
+    get_cursor_position
+
+    case "${char}" in
+      j)
+        down_cursor
+        [ $isVisualMode -eq 0 ] && continue
+        if [ $y -lt $startLine ];then
+          deselect_line $y
+          tput cup $y 0
+        else
+          select_line $((y + 1))
+        fi
+        ;;
+      k)
+        up_cursor
+        [ $isVisualMode -eq 0 ] && continue
+        if [ $y -le $startLine ];then
+          select_line $((y - 1))
+        else
+          deselect_line $y
+          tput cup $((y - 2)) 0
+        fi
+        ;;
+      V) 
+        isVisualMode=1
+        local startLine=$y
+        select_line $y
+        ;;
+      $'\x0d') # ENTER
+        lines=(`tr ' ' '\n' <<< "${lines[@]}" | sort -n | tr '\n' ' '`)
+        start=$((${lines[0]} - 1))
+        end=$((${lines[${#lines[@]} - 1]} + 1 ))
+
+        # redraw until start of select line
+        tput cup 0 0
+        sed -n "1,${start}p" $tmuxBuffer
+
+        # remove selected lines
+        for i in `seq 0 $((${#lines[@]} - 0))`; do
+          tput cup $(expr $start + $i) 0
+          clear_input
+        done
+
+        # redraw from end of select line to last
+        tput cup $start 0
+        sed -n "$((end + 1)),${restoreLine}p" $tmuxBuffer
+        break
+        ;;
+      *)
+        ;;
+    esac
+  done
+  remove_tmux_buffer
+  quit_tty
+}
+main
