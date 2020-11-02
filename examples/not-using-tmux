@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+only_delete_for_non_tmux() {
+  set_cursor_position() {
+    old_settings=$(stty -g) || exit
+    stty -icanon -echo min 0 time 3 || exit
+    printf '\033[6n'
+    pos=$(dd count=1 2> /dev/null)
+    pos=${pos%R*}
+    pos=${pos##*\[}
+    x=${pos##*;} y=${pos%%;*}
+    stty "$old_settings"
+  }
+  stty -icanon min 1 -echo -ixon -icrnl 
+  while true ; do
+    set_cursor_position
+    local char=$(dd bs=1 count=1 2> /dev/null)
+    case "${char}" in
+      j)
+        tput cud1
+        ;;
+      k)
+        tput cuu1
+        tput el
+        ;;
+      $'\x0d') # ENTER
+        break
+        ;;
+      *)
+        ;;
+    esac
+  done
+  stty icanon echo eof '^d' ixon icrnl
+
+}
+only_delete_for_non_tmux
